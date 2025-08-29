@@ -1,26 +1,124 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0b0e12;
+  --card: #0f141b;
+  --muted: #a3a9b7;
+  --brand: #00c2ff;
+  --brand-2: #6ee7ff;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html,
+body,
+#__next {
+  height: 100%;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #f8fafc;
+  color: #0b0e12;
+}
+.container-max {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.btn {
+  @apply inline-flex items-center justify-center rounded-2xl px-3 py-2 text-sm font-medium border border-zinc-200 bg-white hover:bg-zinc-50 transition;
+}
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-2xl px-3 py-2 text-sm font-semibold bg-black text-white hover:bg-zinc-800;
+}
+.card {
+  @apply rounded-2xl border border-zinc-200 bg-white;
+}
+.input {
+  @apply w-full rounded-xl border border-zinc-300 px-3 py-2;
+}
+.select {
+  @apply w-full rounded-xl border border-zinc-300 px-3 py-2 bg-white;
+}
+.badge {
+  @apply text-xs px-2 py-0.5 rounded-full border;
+}
+.table {
+  @apply w-full text-sm;
+}
+.table th {
+  @apply text-left border-b border-zinc-200 py-2;
+}
+.table td {
+  @apply border-b border-zinc-100 py-2;
+}
+
+/* Calendar styles */
+.cell {
+  @apply min-h-24 h-24 border border-zinc-200 relative p-1 bg-white;
+}
+.cell .date {
+  @apply absolute top-1 right-2 text-xs text-zinc-500;
+}
+.shift-pill {
+  @apply text-[10px] px-1.5 py-0.5 rounded-md border mr-1;
+}
+.shift-m {
+  @apply border-zinc-300;
+}
+.shift-a {
+  @apply border-zinc-300;
+}
+.shift-n {
+  @apply border-zinc-300;
+}
+
+.analyse-btn {
+  @apply text-xs underline text-zinc-600 hover:text-black;
+}
+
+.cell {
+  @apply border border-zinc-200 relative p-2 bg-white rounded-xl;
+  min-height: 30rem; /* เดิม ~h-24 → ขยายเป็น ~h-40 */
+}
+.cell.big {
+  min-height: 30rem;
+} /* h ~ 40 */
+.cell .date {
+  @apply absolute top-2 right-3 text-xs text-zinc-500;
+}
+.cell .date.big {
+  @apply text-sm;
+}
+
+/* แถบแต่ละเวร */
+.shift-row {
+  @apply flex items-start gap-2;
+}
+
+.shift-pill {
+  @apply text-xs px-2 py-0.5 rounded-md border mr-1 font-medium;
+}
+.shift-m {
+  @apply bg-blue-50 border-blue-200 text-blue-700;
+}
+.shift-a {
+  @apply bg-amber-50 border-amber-200 text-amber-800;
+}
+.shift-n {
+  @apply bg-violet-50 border-violet-200 text-violet-800;
+}
+
+/* ชิปชื่อพนักงาน — ให้สีตามเวร */
+.chip {
+  @apply text-xs px-2 py-0.5 rounded-lg border;
+}
+.chip-m {
+  @apply bg-blue-50 border-blue-200 text-blue-800;
+}
+.chip-a {
+  @apply bg-amber-50 border-amber-200 text-amber-900;
+}
+.chip-n {
+  @apply bg-violet-50 border-violet-200 text-violet-900;
+}
+
+/* ปุ่มวิเคราะห์ */
+.analyse-btn {
+  @apply text-[11px] underline text-zinc-600 hover:text-black ml-1;
 }
