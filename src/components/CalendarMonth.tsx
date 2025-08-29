@@ -440,6 +440,8 @@ export default function CalendarMonth() {
                         )}
                       </div>
 
+                      <div className='my-4 h-px bg-zinc-200' />
+
                       {/* ปุ่มแก้ไข */}
                       {isAdmin && (
                         <button
