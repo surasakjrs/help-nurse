@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { auth, googleProvider, db } from '@/lib/firebaseClient';
-import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut, signInWithRedirect } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import type { Role, UserDoc } from '@/types/schema';
 
@@ -31,7 +31,7 @@ const envAdmins = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any | null>(null);
   const [role, setRole] = useState<Role | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [adminFlag, setAdminFlag] = useState<boolean>(false); // ✅ คำนวณ isAdmin จากหลายแหล่ง
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!u) {
         setRole(null);
         setAdminFlag(false);
-        setLoading(false);
+        // setLoading(false);
         return;
       }
 
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setAdminFlag(currentRole === 'ADMIN' || envAdmin || docAdmin || workplaceAdmin);
 
-      setLoading(false);
+      // setLoading(false);
     });
   }, []);
 
@@ -99,7 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = useMemo(() => adminFlag, [adminFlag]);
 
   const signIn = async () => {
-    await signInWithPopup(auth, googleProvider);
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (e: any) {
+      // Popup blocked or disallowed → use redirect (works well on mobile)
+      await signInWithRedirect(auth, googleProvider);
+    }
   };
   const signOut = async () => {
     await fbSignOut(auth);

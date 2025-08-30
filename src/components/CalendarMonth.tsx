@@ -7,6 +7,7 @@ import { getPlanner } from '@/services/planner.service';
 import { listStaff } from '@/services/staff.service';
 import { format } from 'date-fns';
 import { useLoading } from '@/context/LoadingContext';
+import CalendarGrid from './CalendarGrid';
 
 const SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT'] as const;
 type Shift = (typeof SHIFTS)[number];
@@ -246,45 +247,35 @@ export default function CalendarMonth() {
 
   return (
     <div className='space-y-4'>
-      <div className='flex flex-wrap items-center gap-2'>
+      {/* Toolbar */}
+      <div className='flex flex-col md:flex-row md:flex-wrap md:items-center gap-2'>
         <h1 className='text-xl font-semibold'>ปฏิทินรายเดือน</h1>
-        <select
-          className='select w-64'
-          value={wid}
-          onChange={(e) => setWid(e.target.value)}
-        >
-          <option value=''>-- เลือกสถานที่ --</option>
-          {workplaces.map((w) => (
-            <option
-              key={w.id}
-              value={w.id}
-            >
-              {w.name}
-            </option>
-          ))}
-        </select>
-        <input
-          className='input w-40'
-          type='month'
-          value={ym}
-          onChange={(e) => setYm(e.target.value)}
-        />
+        <div className='flex flex-col sm:flex-row gap-2 sm:items-center sm:flex-wrap w-full md:w-auto'>
+          <select
+            className='select w-full sm:w-64'
+            value={wid}
+            onChange={(e) => setWid(e.target.value)}
+          >
+            <option value=''>-- เลือกสถานที่ --</option>
+            {workplaces.map((w) => (
+              <option
+                key={w.id}
+                value={w.id}
+              >
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <input
+            className='input w-full sm:w-44 md:w-40'
+            type='month'
+            value={ym}
+            onChange={(e) => setYm(e.target.value)}
+          />
+        </div>
+
         {wid && (
-          <>
-            {/* <a
-              className='btn'
-              href={`/api/export/csv?wid=${wid}&ym=${ym}`}
-              target='_blank'
-            >
-              Export CSV
-            </a>
-            <a
-              className='btn'
-              href={`/api/export/pdf?wid=${wid}&ym=${ym}`}
-              target='_blank'
-            >
-              Export PDF
-            </a> */}
+          <div className='flex flex-wrap items-center gap-2'>
             <a
               className='btn'
               href={`/api/export/xlsx?wid=${wid}&ym=${ym}`}
@@ -295,29 +286,29 @@ export default function CalendarMonth() {
             {isAdmin && (
               <>
                 <button
-                  className='btn-primary'
+                  className='btn-primary w-full sm:w-auto'
                   onClick={triggerAssignAll}
                 >
                   Auto Assign
                 </button>
                 <button
-                  className='btn'
+                  className='btn w-full sm:w-auto'
                   onClick={clearAuto}
                 >
                   ล้าง Auto Assign
                 </button>
               </>
             )}
-          </>
+          </div>
         )}
       </div>
 
       {/* --------- สรุปยอดเดือนนี้ --------- */}
       {wid && planner && (
-        <div className='card p-4 space-y-3'>
-          <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='card p-3 sm:p-4 space-y-3'>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
             <h2 className='font-medium'>สรุปยอดเดือน {ym}</h2>
-            <div className='text-sm text-zinc-600'>
+            <div className='text-xs sm:text-sm text-zinc-600'>
               เวรหลักรวม: <span className='font-semibold'>{sumMain}</span> &nbsp;|&nbsp; OT รวม:{' '}
               <span className='font-semibold'>{sumOT}</span> &nbsp;|&nbsp; OT ขั้นต่ำรวม:{' '}
               <span className='font-semibold'>{sumMinOT}</span> &nbsp;|&nbsp; ยังขาด OT ขั้นต่ำรวม:{' '}
@@ -325,8 +316,9 @@ export default function CalendarMonth() {
               <span className='font-semibold'>{sumAll}</span>
             </div>
           </div>
-          <div className='overflow-auto'>
-            <table className='table min-w-[920px]'>
+          {/* เปลี่ยนเป็นตารางเลื่อนแนวนอนบนมือถือ */}
+          <div className='overflow-x-auto -mx-3 sm:mx-0'>
+            <table className='table min-w-[720px] sm:min-w-[920px]'>
               <thead>
                 <tr>
                   <th>ชื่อ</th>
@@ -376,157 +368,31 @@ export default function CalendarMonth() {
         </div>
       )}
 
+      {/* Calendar grid: 1/2/3/5/7 columns by breakpoint */}
       {!wid ? (
         <div className='text-zinc-500'>กรุณาเลือกสถานที่เพื่อดูปฏิทิน</div>
       ) : (
-        <div className='grid grid-cols-7 gap-2'>
-          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => (
-            <div
-              key={day}
-              className='cell'
-            >
-              <div className='flex items-center justify-between gap-2'>
-                <div className='date'>{day}</div>
-                <button
-                  className='btn xs'
-                  onClick={() => analyseDay(day)}
-                >
-                  Analyse
-                </button>
-              </div>
-
-              <div className='space-y-0 mt-6 text-sm'>
-                {SHIFTS.map((s, idx) => {
-                  const k = `${day}-${s}`;
-                  const ids = aIndex[k] || [];
-                  const vios = vIndex[k] || [];
-                  const isEditing = editingKey === k;
-                  const isLast = idx === SHIFTS.length - 1;
-
-                  return (
-                    <div
-                      key={s}
-                      className={`shift-row relative ${!isLast ? 'border-b border-zinc-200 pb-2 mb-2' : ''}`}
-                    >
-                      <div
-                        className={
-                          'shift-pill ' + (s === 'MORNING' ? 'shift-m' : s === 'AFTERNOON' ? 'shift-a' : 'shift-n')
-                        }
-                      >
-                        {s === 'MORNING' ? 'M' : s === 'AFTERNOON' ? 'A' : 'N'}
-                      </div>
-
-                      {/* แสดงรายชื่อ */}
-                      <div className='flex-1 flex flex-wrap gap-1 items-center'>
-                        {ids.length ? (
-                          ids.map((id: string) => (
-                            <span
-                              key={id}
-                              className={chipClass(s)}
-                            >
-                              {staffMap[id]?.name ?? id}
-                            </span>
-                          ))
-                        ) : (
-                          <span className='text-zinc-400'>-</span>
-                        )}
-
-                        {vios?.includes('NO_INCHARGE') && (
-                          <span className='ml-1 text-[11px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200'>
-                            ไม่มี INCHARGE
-                          </span>
-                        )}
-                        {vios?.includes('UNDER_STAFFED') && (
-                          <span className='ml-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200'>
-                            คนไม่ครบ
-                          </span>
-                        )}
-                      </div>
-
-                      {/* ปุ่มแก้ไข */}
-                      {isAdmin && (
-                        <button
-                          className='btn xs'
-                          onClick={() => (isEditing ? cancelEditor() : openEditor(day, s))}
-                        >
-                          {isEditing ? 'ยกเลิก' : 'แก้ไข'}
-                        </button>
-                      )}
-
-                      {/* แพเนลแก้ไข inline (ยึดกับ shift-row) */}
-                      {isEditing && (
-                        <div className='absolute left-0 top-full mt-2 z-20 w-[min(420px,calc(100vw-3rem))]'>
-                          <div className='card p-3 space-y-2 shadow-lg ring-1 ring-zinc-200'>
-                            <div className='flex flex-wrap items-center gap-2'>
-                              <select
-                                className='select min-w-44'
-                                value={addSelect}
-                                onChange={(e) => setAddSelect(e.target.value)}
-                              >
-                                <option value=''>-- เพิ่มพนักงาน --</option>
-                                {staffArr.map((u) => (
-                                  <option
-                                    key={u.id}
-                                    value={u.id}
-                                  >
-                                    {u.name} ({u.role})
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                className='btn'
-                                onClick={addToDraft}
-                              >
-                                เพิ่ม
-                              </button>
-                              <div className='text-xs text-zinc-600 ml-auto'>
-                                ต้องการคน: {planner?.demand?.[s] ?? 0} | เลือกแล้ว: {draftIds.length}
-                              </div>
-                            </div>
-                            <div className='flex flex-wrap gap-1'>
-                              {draftIds.length ? (
-                                draftIds.map((id) => (
-                                  <span
-                                    key={`draft-${id}`}
-                                    className='chip'
-                                  >
-                                    {staffMap[id]?.name ?? id}
-                                    <button
-                                      className='ml-1 text-xs'
-                                      onClick={() => removeFromDraft(id)}
-                                    >
-                                      ×
-                                    </button>
-                                  </span>
-                                ))
-                              ) : (
-                                <span className='text-zinc-400'>ยังไม่มีคน</span>
-                              )}
-                            </div>
-                            <div className='flex items-center gap-2 justify-end'>
-                              <button
-                                className='btn'
-                                onClick={cancelEditor}
-                              >
-                                ยกเลิก
-                              </button>
-                              <button
-                                className='btn-primary'
-                                onClick={() => saveDraft(day, s)}
-                              >
-                                บันทึก
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+        <CalendarGrid
+          daysInMonth={daysInMonth}
+          SHIFTS={SHIFTS}
+          aIndex={aIndex}
+          vIndex={vIndex}
+          isAdmin={isAdmin}
+          analyseDay={analyseDay}
+          editingKey={editingKey}
+          openEditor={openEditor}
+          cancelEditor={cancelEditor}
+          addSelect={addSelect}
+          setAddSelect={setAddSelect}
+          addToDraft={addToDraft}
+          draftIds={draftIds}
+          removeFromDraft={removeFromDraft}
+          saveDraft={saveDraft}
+          planner={planner}
+          staffMap={staffMap}
+          staffArr={staffArr}
+          chipClass={chipClass}
+        />
       )}
 
       {/* ---------- Modal: Analyse ทั้งวัน (แท็บเช้า/บ่าย/ดึก) ---------- */}
@@ -536,12 +402,12 @@ export default function CalendarMonth() {
             className='absolute inset-0 bg-black/50'
             onClick={() => setShowModal(false)}
           />
-          <div className='relative z-10 mx-auto my-8 w-full max-w-5xl px-3'>
-            <div className='card p-4 max-h-[80vh] overflow-auto'>
+          <div className='relative z-10 mx-auto my-0 sm:my-8 w-full sm:max-w-5xl px-0 sm:px-3 h-full sm:h-auto'>
+            <div className='card rounded-none sm:rounded-xl p-3 sm:p-4 max-h-full sm:max-h-[80vh] h-full sm:h-auto overflow-auto'>
               <div className='flex items-start justify-between gap-4'>
                 <div>
-                  <h3 className='text-lg font-semibold'>วิเคราะห์รายวัน</h3>
-                  <p className='text-sm text-zinc-600'>
+                  <h3 className='text-base sm:text-lg font-semibold'>วิเคราะห์รายวัน</h3>
+                  <p className='text-xs sm:text-sm text-zinc-600'>
                     {analyseDayNoNight ? 'หมายเหตุ: เวรดึกของวันนี้ถูกปิดตามนโยบาย' : 'รวมทั้ง เช้า/บ่าย/ดึก'}
                   </p>
                 </div>
@@ -554,7 +420,7 @@ export default function CalendarMonth() {
               </div>
 
               {/* Tabs */}
-              <div className='mt-4 border-b flex gap-2'>
+              <div className='mt-3 sm:mt-4 border-b flex gap-2'>
                 {(['MORNING', 'AFTERNOON', 'NIGHT'] as Shift[]).map((s) =>
                   analyseDayData[s] ? (
                     <button
@@ -572,7 +438,7 @@ export default function CalendarMonth() {
 
               {/* Content */}
               {analyseDayData[activeTab] && (
-                <div className='grid md:grid-cols-2 gap-4 mt-4'>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4'>
                   {/* INCHARGE */}
                   <section className='space-y-3'>
                     <h4 className='font-medium'>INCHARGE — {activeTab}</h4>

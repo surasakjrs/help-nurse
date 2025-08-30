@@ -37,7 +37,7 @@ export default function AppHeader() {
   const isActive = (p: string) => (pathname || '').startsWith(p);
 
   return (
-    <header className='flex items-center justify-between py-3 border-b border-zinc-200'>
+    <header className='flex flex-col items-center justify-between py-3 border-b border-zinc-200'>
       <Link
         href='/'
         className='text-lg font-semibold'
@@ -46,52 +46,57 @@ export default function AppHeader() {
       </Link>
 
       <nav className='flex items-center gap-2'>
-        {/* เมนูที่ต้องเป็นแอดมินเท่านั้น */}
-        <NavItem
-          href='/workplaces'
-          active={isActive('/workplaces')}
-          hidden={!isAdmin}
-          disabled={loading}
-        >
-          สถานที่ทำงาน
-        </NavItem>
-        <NavItem
-          href='/planners'
-          active={isActive('/planners')}
-          hidden={!isAdmin}
-          disabled={loading}
-        >
-          แผนรายเดือน
-        </NavItem>
-        {/* <NavItem href="/dashboard" active={isActive('/dashboard')} hidden={!isAdmin} disabled={loading}>
-          Dashboard
-        </NavItem> */}
-
-        {/* เส้นคั่นแนวตั้งระหว่างกลุ่มเมนู */}
-        <div
-          aria-hidden
-          className='hidden md:block w-px h-6 bg-zinc-200 mx-1'
-        />
-
-        {/* เมนูทั่วไป */}
-        <NavItem
-          href='/calendar'
-          active={isActive('/calendar')}
-          hidden={!isAdmin}
-          disabled={loading}
-        >
-          ปฏิทิน
-        </NavItem>
-
-        {/* เส้นคั่นแนวตั้งก่อนส่วนผู้ใช้ */}
-        <div
-          aria-hidden
-          className='hidden md:block w-px h-6 bg-zinc-200 mx-1'
-        />
-
         {/* ขวาสุด: สถานะผู้ใช้ */}
         {user ? (
           <>
+            {/* เมนูที่ต้องเป็นแอดมินเท่านั้น */}
+            <NavItem
+              href='/workplaces'
+              active={isActive('/workplaces')}
+              disabled={loading}
+            >
+              สถานที่ทำงาน
+            </NavItem>
+
+            {/* เส้นคั่นแนวตั้งระหว่างกลุ่มเมนู */}
+            <div
+              aria-hidden
+              className='hidden md:block w-px h-6 bg-zinc-200 mx-1'
+            />
+
+            <NavItem
+              href='/planners'
+              active={isActive('/planners')}
+              disabled={loading}
+            >
+              แผนรายเดือน
+            </NavItem>
+            {/* <NavItem href="/dashboard" active={isActive('/dashboard')} hidden={!isAdmin} disabled={loading}>
+          Dashboard
+        </NavItem> */}
+
+            {/* เส้นคั่นแนวตั้งระหว่างกลุ่มเมนู */}
+            <div
+              aria-hidden
+              className='hidden md:block w-px h-6 bg-zinc-200 mx-1'
+            />
+
+            {/* เมนูทั่วไป */}
+            <NavItem
+              href='/calendar'
+              active={isActive('/calendar')}
+              hidden={!isAdmin}
+              disabled={loading}
+            >
+              ปฏิทิน
+            </NavItem>
+
+            {/* เส้นคั่นแนวตั้งก่อนส่วนผู้ใช้ */}
+            <div
+              aria-hidden
+              className='hidden md:block w-px h-6 bg-zinc-200 mx-1'
+            />
+
             {user.photoURL && (
               <img
                 src={user.photoURL}

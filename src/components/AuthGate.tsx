@@ -29,19 +29,21 @@ export default function AuthGate({ children, requireAdmin }: { children: React.R
 
   if (loading) return null; // ใช้ overlay จาก LoadingProvider
 
-  if (!user) {
-    return (
-      <div className='max-w-lg mx-auto space-y-4'>
-        <h1 className='text-xl font-semibold'>กรุณาเข้าสู่ระบบ</h1>
-        <Link
-          href='/login'
-          className='btn-primary'
-        >
-          ไปหน้า Login
-        </Link>
-      </div>
-    );
-  }
+  if (!user) return null;
+
+  // if (!user) {
+  //   return (
+  //     <div className='max-w-lg mx-auto space-y-4'>
+  //       <h1 className='text-xl font-semibold'>กรุณาเข้าสู่ระบบ</h1>
+  //       <Link
+  //         href='/login'
+  //         className='btn-primary'
+  //       >
+  //         ไปหน้า Login
+  //       </Link>
+  //     </div>
+  //   );
+  // }
 
   if (requireAdmin && !isAdmin) {
     return <div className='max-w-lg mx-auto'>คุณไม่มีสิทธิ์เข้าหน้านี้</div>;

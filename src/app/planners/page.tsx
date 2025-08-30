@@ -15,7 +15,19 @@ export default function PlannersIndex() {
     <AuthGate requireAdmin>
       <div className='space-y-4'>
         <h1 className='text-xl font-semibold'>เลือกสถานที่เพื่อจัดแผนรายเดือน</h1>
-        <ul className='list-disc pl-6'>
+
+        <div className='flex flex-col gap-2'>
+          {items.map((w) => (
+            <Link
+              className='border border-black rounded-3xl p-4 cursor-pointer w-full block hover:bg-gray-100'
+              key={w.id}
+              href={`/planners/${w.id}`}
+            >
+              {w.name}
+            </Link>
+          ))}
+        </div>
+        {/* <ul className='list-disc pl-6'>
           {items.map((w) => (
             <li key={w.id}>
               <Link
@@ -26,7 +38,7 @@ export default function PlannersIndex() {
               </Link>
             </li>
           ))}
-        </ul>
+        </ul> */}
       </div>
     </AuthGate>
   );

@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { LoadingProvider } from '@/context/LoadingContext';
 import AppHeader from '@/components/AppHeader';
 import AuthLoadingBridge from '@/components/AuthLoadingBridge';
+import ScrollToTopButton from '@/components/ScrollToTopButton';
 
 export const metadata: Metadata = {
   title: 'Nurse Roster App',
@@ -24,7 +25,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <AuthProvider>
             <div className='container-max p-4 min-h-dvh flex flex-col'>
               <AppHeader />
-              <main className='flex-1'>{children}</main>
+              <main className='flex-1 mt-4'>
+                {children}
+                <ScrollToTopButton />
+              </main>
             </div>
             {/* สะพานเชื่อมโหลด auth → overlay */}
             <AuthLoadingBridge />
