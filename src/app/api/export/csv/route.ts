@@ -5,7 +5,11 @@ import { getPlanner } from '@/services/planner.service';
 import type { ShiftType } from '@/types/schema';
 import { daysIn } from '@/lib/util';
 
-const SHIFTS: ShiftType[] = ['MORNING', 'AFTERNOON', 'NIGHT'];
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const SHIFTS: ShiftType[] = ['MORNING', 'AFTERNOON', 'NIGHT'] as const;
 
 // แปลงชื่อเวรให้ตรงตัวอย่างภาพ
 function shiftLabel(s: ShiftType) {
@@ -14,13 +18,26 @@ function shiftLabel(s: ShiftType) {
   return 'NIGHT';
 }
 
+// ครอบค่า CSV เมื่อมีคอมม่า/อัญประกาศ/ขึ้นบรรทัดใหม่
+function csvCell(raw: string) {
+  const s = (raw ?? '').toString();
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function isValidYm(ym: string) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(ym);
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const wid = searchParams.get('wid') || '';
-  const ym = searchParams.get('ym') || '';
+  const wid = (searchParams.get('wid') || '').trim();
+  const ym = (searchParams.get('ym') || '').trim();
 
-  if (!wid || !ym) {
-    return new Response('wid and ym are required', { status: 400 });
+  if (!wid || !isValidYm(ym)) {
+    return new Response('wid and ym (YYYY-MM) are required', { status: 400 });
   }
 
   // โหลดข้อมูลหลัก
@@ -33,9 +50,10 @@ export async function GET(req: NextRequest) {
   // index assignments: day -> shift -> staffIds[]
   const idx: Record<number, Record<ShiftType, string[]>> = {};
   for (const a of assignments) {
-    if (!idx[a.day]) idx[a.day] = { MORNING: [], AFTERNOON: [], NIGHT: [] };
+    const day = a.day as number;
     const s = (a.shift as ShiftType) || 'MORNING';
-    idx[a.day][s] = a.staffIds || [];
+    if (!idx[day]) idx[day] = { MORNING: [], AFTERNOON: [], NIGHT: [] };
+    idx[day][s] = a.staffIds || [];
   }
 
   // เตรียม dayOff map: sid -> Set<number>
@@ -50,7 +68,7 @@ export async function GET(req: NextRequest) {
   // header ตามภาพ: ช่องแรกว่าง แล้วเป็น "วันที่ 1" ... "วันที่ N"
   const header = [''].concat(Array.from({ length: totalDays }, (_, i) => `วันที่ ${i + 1}`));
 
-  // สร้างแถวพนักงาน: เรียงตามชื่อ (เฉพาะ active ก่อน แล้วค่อย inactive)
+  // สร้างแถวพนักงาน: เรียงตามชื่อ (active ก่อน แล้วค่อย inactive)
   const active = staff.filter((s: any) => s.active);
   const inactive = staff.filter((s: any) => !s.active);
   const staffRows = [...active, ...inactive].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', 'th'));
@@ -59,8 +77,8 @@ export async function GET(req: NextRequest) {
 
   for (const u of staffRows) {
     const sid = u.id as string;
-    const name = (u.name || '').replace(/[\r\n]/g, ' ').trim();
-    const row: string[] = [name];
+    const nameRaw = (u.name || '').replace(/[\r\n]/g, ' ').trim();
+    const row: string[] = [csvCell(nameRaw)]; // ✅ ครอบชื่อด้วย csvCell
 
     for (let d = 1; d <= totalDays; d++) {
       // หาเวรทั้งหมดของคนนี้ในวัน d
@@ -81,11 +99,7 @@ export async function GET(req: NextRequest) {
         cell = '';
       }
 
-      // กันคอมม่าหลุดคอลัมน์ด้วยการครอบเครื่องหมายคำพูดเมื่อมีคอมม่า
-      if (cell.includes(',') || cell.includes('"')) {
-        cell = `"${cell.replace(/"/g, '""')}"`;
-      }
-      row.push(cell);
+      row.push(csvCell(cell)); // ✅ ครอบทุกช่อง
     }
 
     rows.push(row);

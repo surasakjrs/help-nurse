@@ -271,7 +271,7 @@ export default function CalendarMonth() {
         />
         {wid && (
           <>
-            <a
+            {/* <a
               className='btn'
               href={`/api/export/csv?wid=${wid}&ym=${ym}`}
               target='_blank'
@@ -284,7 +284,7 @@ export default function CalendarMonth() {
               target='_blank'
             >
               Export PDF
-            </a>
+            </a> */}
             <a
               className='btn'
               href={`/api/export/xlsx?wid=${wid}&ym=${ym}`}
@@ -394,16 +394,19 @@ export default function CalendarMonth() {
                   Analyse
                 </button>
               </div>
-              <div className='space-y-2 mt-6 text-sm'>
-                {(['MORNING', 'AFTERNOON', 'NIGHT'] as const).map((s) => {
+
+              <div className='space-y-0 mt-6 text-sm'>
+                {SHIFTS.map((s, idx) => {
                   const k = `${day}-${s}`;
                   const ids = aIndex[k] || [];
                   const vios = vIndex[k] || [];
                   const isEditing = editingKey === k;
+                  const isLast = idx === SHIFTS.length - 1;
+
                   return (
                     <div
                       key={s}
-                      className='shift-row'
+                      className={`shift-row relative ${!isLast ? 'border-b border-zinc-200 pb-2 mb-2' : ''}`}
                     >
                       <div
                         className={
@@ -440,8 +443,6 @@ export default function CalendarMonth() {
                         )}
                       </div>
 
-                      <div className='my-4 h-px bg-zinc-200' />
-
                       {/* ปุ่มแก้ไข */}
                       {isAdmin && (
                         <button
@@ -452,10 +453,10 @@ export default function CalendarMonth() {
                         </button>
                       )}
 
-                      {/* แพเนลแก้ไข inline */}
+                      {/* แพเนลแก้ไข inline (ยึดกับ shift-row) */}
                       {isEditing && (
-                        <div className='mt-2 absolute left-0 z-10'>
-                          <div className='card p-3 space-y-2'>
+                        <div className='absolute left-0 top-full mt-2 z-20 w-[min(420px,calc(100vw-3rem))]'>
+                          <div className='card p-3 space-y-2 shadow-lg ring-1 ring-zinc-200'>
                             <div className='flex flex-wrap items-center gap-2'>
                               <select
                                 className='select min-w-44'
