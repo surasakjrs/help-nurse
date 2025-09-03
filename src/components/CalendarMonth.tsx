@@ -6,7 +6,9 @@ import { getAssignmentsByMonth } from '@/services/assignment.service';
 import { getPlanner } from '@/services/planner.service';
 import { listStaff } from '@/services/staff.service';
 import { format } from 'date-fns';
+// import { enUS } from 'date-fns/locale';
 import { useLoading } from '@/context/LoadingContext';
+import CalendarGrid from './CalendarGrid';
 
 const SHIFTS = ['MORNING', 'AFTERNOON', 'NIGHT'] as const;
 type Shift = (typeof SHIFTS)[number];
@@ -38,6 +40,12 @@ function ymNow() {
   return format(d, 'yyyy-MM');
 }
 
+// function dayName(ym: string, day: number) {
+//   const [Y, M] = ym.split('-').map(Number);
+//   const date = new Date(Y, M - 1, day); // month ต้อง -1
+//   return format(date, 'EEEE', { locale: enUS }); // Monday, Tuesday, ...
+// }
+
 export default function CalendarMonth() {
   const { user, isAdmin } = useAuth();
   const { withLoading } = useLoading();
@@ -46,8 +54,10 @@ export default function CalendarMonth() {
   const [workplaces, setWorkplaces] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [planner, setPlanner] = useState<any>(null);
-  const [staffMap, setStaffMap] = useState<Record<string, { id: string; name: string; role: string }>>({});
-  const [staffArr, setStaffArr] = useState<Array<{ id: string; name: string; role: string }>>([]);
+  const [staffMap, setStaffMap] = useState<Record<string, { id: string; name: string; role: string; color: string }>>(
+    {}
+  );
+  const [staffArr, setStaffArr] = useState<Array<{ id: string; name: string; role: string; color: string }>>([]);
 
   // modal analyse (แบบทั้งวัน)
   const [showModal, setShowModal] = useState(false);
@@ -89,9 +99,11 @@ export default function CalendarMonth() {
     (async () => {
       const staff = await listStaff(wid);
       if (!alive) return;
-      const map = Object.fromEntries(staff.map((s: any) => [s.id, { id: s.id, name: s.name, role: s.role }]));
+      const map = Object.fromEntries(
+        staff.map((s: any) => [s.id, { id: s.id, name: s.name, role: s.role, color: s.color }])
+      );
       setStaffMap(map);
-      setStaffArr(staff.map((s: any) => ({ id: s.id, name: s.name, role: s.role })));
+      setStaffArr(staff.map((s: any) => ({ id: s.id, name: s.name, role: s.role, color: s.color })));
     })();
     return () => {
       alive = false;
@@ -121,6 +133,7 @@ export default function CalendarMonth() {
       id: string;
       name: string;
       role: string;
+      color: string;
       base: number;
       minOT: number;
       total: number;
@@ -132,14 +145,14 @@ export default function CalendarMonth() {
     const countMap: Record<string, number> = {};
     for (const a of assignments) for (const sid of a.staffIds || []) countMap[sid] = (countMap[sid] ?? 0) + 1;
     for (const id of Object.keys(staffMap)) {
-      const { name, role } = staffMap[id];
+      const { name, role, color } = staffMap[id];
       const total = countMap[id] ?? 0;
       const base = planner?.baseShifts?.[id] ?? 0;
       const minOT = planner?.minOT?.[id] ?? 0;
       const main = Math.min(total, base);
       const ot = Math.max(0, total - base);
       const deficit = Math.max(0, minOT - ot);
-      rows.push({ id, name, role, base, minOT, total, main, ot, deficit });
+      rows.push({ id, name, role, color, base, minOT, total, main, ot, deficit });
     }
     rows.sort((a, b) => b.deficit - a.deficit || b.ot - a.ot || a.name.localeCompare(b.name, 'th'));
     return rows;
@@ -246,78 +259,68 @@ export default function CalendarMonth() {
 
   return (
     <div className='space-y-4'>
-      <div className='flex flex-wrap items-center gap-2'>
+      {/* Toolbar */}
+      <div className='flex flex-col gap-2'>
         <h1 className='text-xl font-semibold'>ปฏิทินรายเดือน</h1>
-        <select
-          className='select w-64'
-          value={wid}
-          onChange={(e) => setWid(e.target.value)}
-        >
-          <option value=''>-- เลือกสถานที่ --</option>
-          {workplaces.map((w) => (
-            <option
-              key={w.id}
-              value={w.id}
-            >
-              {w.name}
-            </option>
-          ))}
-        </select>
-        <input
-          className='input w-40'
-          type='month'
-          value={ym}
-          onChange={(e) => setYm(e.target.value)}
-        />
-        {wid && (
-          <>
-            <a
-              className='btn'
-              href={`/api/export/csv?wid=${wid}&ym=${ym}`}
-              target='_blank'
-            >
-              Export CSV
-            </a>
-            <a
-              className='btn'
-              href={`/api/export/pdf?wid=${wid}&ym=${ym}`}
-              target='_blank'
-            >
-              Export PDF
-            </a>
-            <a
-              className='btn'
-              href={`/api/export/xlsx?wid=${wid}&ym=${ym}`}
-              target='_blank'
-            >
-              Export Excel
-            </a>
-            {isAdmin && (
-              <>
-                <button
-                  className='btn-primary'
-                  onClick={triggerAssignAll}
-                >
-                  Auto Assign
-                </button>
-                <button
-                  className='btn'
-                  onClick={clearAuto}
-                >
-                  ล้าง Auto Assign
-                </button>
-              </>
-            )}
-          </>
-        )}
+        <div className='flex flex-col lg:flex-row gap-2 sm:items-center sm:flex-wrap w-full md:w-auto'>
+          <select
+            className='select w-full sm:w-64'
+            value={wid}
+            onChange={(e) => setWid(e.target.value)}
+          >
+            <option value=''>-- เลือกสถานที่ --</option>
+            {workplaces.map((w) => (
+              <option
+                key={w.id}
+                value={w.id}
+              >
+                {w.name}
+              </option>
+            ))}
+          </select>
+          <input
+            className='input w-full sm:w-44 md:w-40'
+            type='month'
+            value={ym}
+            onChange={(e) => setYm(e.target.value)}
+          />
+
+          {wid && (
+            <div className='flex md:flex-row items-center gap-2 w-full '>
+              <a
+                className='btn w-full'
+                href={`/api/export/xlsx?wid=${wid}&ym=${ym}`}
+                target='_blank'
+              >
+                Export Excel
+              </a>
+              {isAdmin && (
+                <>
+                  <button
+                    className='btn-primary w-full'
+                    onClick={triggerAssignAll}
+                  >
+                    Auto Assign
+                  </button>
+                  <button
+                    className='btn w-full'
+                    onClick={clearAuto}
+                  >
+                    ล้าง Auto Assign
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* --------- สรุปยอดเดือนนี้ --------- */}
       {wid && planner && (
-        <div className='card p-4 space-y-3'>
-          <div className='flex flex-wrap items-center justify-between gap-2'>
+        <div className='card p-3 sm:p-4 space-y-3'>
+          <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2'>
             <h2 className='font-medium'>สรุปยอดเดือน {ym}</h2>
-            <div className='text-sm text-zinc-600'>
+            <div className='text-xs sm:text-sm text-zinc-600'>
               เวรหลักรวม: <span className='font-semibold'>{sumMain}</span> &nbsp;|&nbsp; OT รวม:{' '}
               <span className='font-semibold'>{sumOT}</span> &nbsp;|&nbsp; OT ขั้นต่ำรวม:{' '}
               <span className='font-semibold'>{sumMinOT}</span> &nbsp;|&nbsp; ยังขาด OT ขั้นต่ำรวม:{' '}
@@ -325,8 +328,9 @@ export default function CalendarMonth() {
               <span className='font-semibold'>{sumAll}</span>
             </div>
           </div>
-          <div className='overflow-auto'>
-            <table className='table min-w-[920px]'>
+          {/* เปลี่ยนเป็นตารางเลื่อนแนวนอนบนมือถือ */}
+          <div className='overflow-x-auto -mx-3 sm:mx-0'>
+            <table className='table min-w-[720px] sm:min-w-[920px]'>
               <thead>
                 <tr>
                   <th>ชื่อ</th>
@@ -339,7 +343,7 @@ export default function CalendarMonth() {
                   <th>ขาด/เกิน OT ขั้นต่ำ</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className='relative'>
                 {summaryRows.map((r) => (
                   <tr key={r.id}>
                     <td className='whitespace-nowrap'>{r.name}</td>
@@ -376,156 +380,32 @@ export default function CalendarMonth() {
         </div>
       )}
 
+      {/* Calendar grid: 1/2/3/5/7 columns by breakpoint */}
       {!wid ? (
-        <div className='text-zinc-500'>กรุณาเลือกสถานที่เพื่อดูปฏิทิน</div>
+        <div className='text-zinc-500 text-center'>กรุณาเลือกสถานที่เพื่อดูปฏิทิน</div>
       ) : (
-        <div className='grid grid-cols-7 gap-2'>
-          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => (
-            <div
-              key={day}
-              className='cell'
-            >
-              <div className='flex items-center justify-between gap-2'>
-                <div className='date'>{day}</div>
-                <button
-                  className='btn xs'
-                  onClick={() => analyseDay(day)}
-                >
-                  Analyse
-                </button>
-              </div>
-              <div className='space-y-2 mt-6 text-sm'>
-                {(['MORNING', 'AFTERNOON', 'NIGHT'] as const).map((s) => {
-                  const k = `${day}-${s}`;
-                  const ids = aIndex[k] || [];
-                  const vios = vIndex[k] || [];
-                  const isEditing = editingKey === k;
-                  return (
-                    <div
-                      key={s}
-                      className='shift-row'
-                    >
-                      <div
-                        className={
-                          'shift-pill ' + (s === 'MORNING' ? 'shift-m' : s === 'AFTERNOON' ? 'shift-a' : 'shift-n')
-                        }
-                      >
-                        {s === 'MORNING' ? 'M' : s === 'AFTERNOON' ? 'A' : 'N'}
-                      </div>
-
-                      {/* แสดงรายชื่อ */}
-                      <div className='flex-1 flex flex-wrap gap-1 items-center'>
-                        {ids.length ? (
-                          ids.map((id: string) => (
-                            <span
-                              key={id}
-                              className={chipClass(s)}
-                            >
-                              {staffMap[id]?.name ?? id}
-                            </span>
-                          ))
-                        ) : (
-                          <span className='text-zinc-400'>-</span>
-                        )}
-
-                        {vios?.includes('NO_INCHARGE') && (
-                          <span className='ml-1 text-[11px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200'>
-                            ไม่มี INCHARGE
-                          </span>
-                        )}
-                        {vios?.includes('UNDER_STAFFED') && (
-                          <span className='ml-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200'>
-                            คนไม่ครบ
-                          </span>
-                        )}
-                      </div>
-
-                      <div className='my-4 h-px bg-zinc-200' />
-
-                      {/* ปุ่มแก้ไข */}
-                      {isAdmin && (
-                        <button
-                          className='btn xs'
-                          onClick={() => (isEditing ? cancelEditor() : openEditor(day, s))}
-                        >
-                          {isEditing ? 'ยกเลิก' : 'แก้ไข'}
-                        </button>
-                      )}
-
-                      {/* แพเนลแก้ไข inline */}
-                      {isEditing && (
-                        <div className='mt-2 absolute left-0 z-10'>
-                          <div className='card p-3 space-y-2'>
-                            <div className='flex flex-wrap items-center gap-2'>
-                              <select
-                                className='select min-w-44'
-                                value={addSelect}
-                                onChange={(e) => setAddSelect(e.target.value)}
-                              >
-                                <option value=''>-- เพิ่มพนักงาน --</option>
-                                {staffArr.map((u) => (
-                                  <option
-                                    key={u.id}
-                                    value={u.id}
-                                  >
-                                    {u.name} ({u.role})
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                className='btn'
-                                onClick={addToDraft}
-                              >
-                                เพิ่ม
-                              </button>
-                              <div className='text-xs text-zinc-600 ml-auto'>
-                                ต้องการคน: {planner?.demand?.[s] ?? 0} | เลือกแล้ว: {draftIds.length}
-                              </div>
-                            </div>
-                            <div className='flex flex-wrap gap-1'>
-                              {draftIds.length ? (
-                                draftIds.map((id) => (
-                                  <span
-                                    key={`draft-${id}`}
-                                    className='chip'
-                                  >
-                                    {staffMap[id]?.name ?? id}
-                                    <button
-                                      className='ml-1 text-xs'
-                                      onClick={() => removeFromDraft(id)}
-                                    >
-                                      ×
-                                    </button>
-                                  </span>
-                                ))
-                              ) : (
-                                <span className='text-zinc-400'>ยังไม่มีคน</span>
-                              )}
-                            </div>
-                            <div className='flex items-center gap-2 justify-end'>
-                              <button
-                                className='btn'
-                                onClick={cancelEditor}
-                              >
-                                ยกเลิก
-                              </button>
-                              <button
-                                className='btn-primary'
-                                onClick={() => saveDraft(day, s)}
-                              >
-                                บันทึก
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+        <CalendarGrid
+          daysInMonth={daysInMonth}
+          ym={ym}
+          SHIFTS={SHIFTS}
+          aIndex={aIndex}
+          vIndex={vIndex}
+          isAdmin={isAdmin}
+          analyseDay={analyseDay}
+          editingKey={editingKey}
+          openEditor={openEditor}
+          cancelEditor={cancelEditor}
+          addSelect={addSelect}
+          setAddSelect={setAddSelect}
+          addToDraft={addToDraft}
+          draftIds={draftIds}
+          removeFromDraft={removeFromDraft}
+          saveDraft={saveDraft}
+          planner={planner}
+          staffMap={staffMap}
+          staffArr={staffArr}
+          chipClass={chipClass}
+        />
       )}
 
       {/* ---------- Modal: Analyse ทั้งวัน (แท็บเช้า/บ่าย/ดึก) ---------- */}
@@ -535,12 +415,12 @@ export default function CalendarMonth() {
             className='absolute inset-0 bg-black/50'
             onClick={() => setShowModal(false)}
           />
-          <div className='relative z-10 mx-auto my-8 w-full max-w-5xl px-3'>
-            <div className='card p-4 max-h-[80vh] overflow-auto'>
+          <div className='relative z-10 mx-auto my-0 sm:my-8 w-full sm:max-w-5xl px-0 sm:px-3 h-full sm:h-auto'>
+            <div className='card rounded-none sm:rounded-xl p-3 sm:p-4 max-h-full sm:max-h-[80vh] h-full sm:h-auto overflow-auto'>
               <div className='flex items-start justify-between gap-4'>
                 <div>
-                  <h3 className='text-lg font-semibold'>วิเคราะห์รายวัน</h3>
-                  <p className='text-sm text-zinc-600'>
+                  <h3 className='text-base sm:text-lg font-semibold'>วิเคราะห์รายวัน</h3>
+                  <p className='text-xs sm:text-sm text-zinc-600'>
                     {analyseDayNoNight ? 'หมายเหตุ: เวรดึกของวันนี้ถูกปิดตามนโยบาย' : 'รวมทั้ง เช้า/บ่าย/ดึก'}
                   </p>
                 </div>
@@ -553,7 +433,7 @@ export default function CalendarMonth() {
               </div>
 
               {/* Tabs */}
-              <div className='mt-4 border-b flex gap-2'>
+              <div className='mt-3 sm:mt-4 border-b flex gap-2'>
                 {(['MORNING', 'AFTERNOON', 'NIGHT'] as Shift[]).map((s) =>
                   analyseDayData[s] ? (
                     <button
@@ -571,7 +451,7 @@ export default function CalendarMonth() {
 
               {/* Content */}
               {analyseDayData[activeTab] && (
-                <div className='grid md:grid-cols-2 gap-4 mt-4'>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4'>
                   {/* INCHARGE */}
                   <section className='space-y-3'>
                     <h4 className='font-medium'>INCHARGE — {activeTab}</h4>

@@ -12,9 +12,16 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import type { Staff, StaffRole } from '@/types/schema';
+import type { PersonColorKey, Staff, StaffRole } from '@/types/schema';
 
-export async function addStaff(v: { wid: string; name: string; title?: string; role: StaffRole; active: boolean }) {
+export async function addStaff(v: {
+  wid: string;
+  name: string;
+  title?: string;
+  role: StaffRole;
+  active: boolean;
+  color?: PersonColorKey;
+}) {
   const col = collection(db, 'staff');
   await addDoc(col, { ...v, createdAt: serverTimestamp() });
 }
