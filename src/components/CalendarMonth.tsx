@@ -6,6 +6,7 @@ import { getAssignmentsByMonth } from '@/services/assignment.service';
 import { getPlanner } from '@/services/planner.service';
 import { listStaff } from '@/services/staff.service';
 import { format } from 'date-fns';
+// import { enUS } from 'date-fns/locale';
 import { useLoading } from '@/context/LoadingContext';
 import CalendarGrid from './CalendarGrid';
 
@@ -39,6 +40,12 @@ function ymNow() {
   return format(d, 'yyyy-MM');
 }
 
+// function dayName(ym: string, day: number) {
+//   const [Y, M] = ym.split('-').map(Number);
+//   const date = new Date(Y, M - 1, day); // month ต้อง -1
+//   return format(date, 'EEEE', { locale: enUS }); // Monday, Tuesday, ...
+// }
+
 export default function CalendarMonth() {
   const { user, isAdmin } = useAuth();
   const { withLoading } = useLoading();
@@ -47,8 +54,10 @@ export default function CalendarMonth() {
   const [workplaces, setWorkplaces] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [planner, setPlanner] = useState<any>(null);
-  const [staffMap, setStaffMap] = useState<Record<string, { id: string; name: string; role: string }>>({});
-  const [staffArr, setStaffArr] = useState<Array<{ id: string; name: string; role: string }>>([]);
+  const [staffMap, setStaffMap] = useState<Record<string, { id: string; name: string; role: string; color: string }>>(
+    {}
+  );
+  const [staffArr, setStaffArr] = useState<Array<{ id: string; name: string; role: string; color: string }>>([]);
 
   // modal analyse (แบบทั้งวัน)
   const [showModal, setShowModal] = useState(false);
@@ -90,9 +99,11 @@ export default function CalendarMonth() {
     (async () => {
       const staff = await listStaff(wid);
       if (!alive) return;
-      const map = Object.fromEntries(staff.map((s: any) => [s.id, { id: s.id, name: s.name, role: s.role }]));
+      const map = Object.fromEntries(
+        staff.map((s: any) => [s.id, { id: s.id, name: s.name, role: s.role, color: s.color }])
+      );
       setStaffMap(map);
-      setStaffArr(staff.map((s: any) => ({ id: s.id, name: s.name, role: s.role })));
+      setStaffArr(staff.map((s: any) => ({ id: s.id, name: s.name, role: s.role, color: s.color })));
     })();
     return () => {
       alive = false;
@@ -122,6 +133,7 @@ export default function CalendarMonth() {
       id: string;
       name: string;
       role: string;
+      color: string;
       base: number;
       minOT: number;
       total: number;
@@ -133,14 +145,14 @@ export default function CalendarMonth() {
     const countMap: Record<string, number> = {};
     for (const a of assignments) for (const sid of a.staffIds || []) countMap[sid] = (countMap[sid] ?? 0) + 1;
     for (const id of Object.keys(staffMap)) {
-      const { name, role } = staffMap[id];
+      const { name, role, color } = staffMap[id];
       const total = countMap[id] ?? 0;
       const base = planner?.baseShifts?.[id] ?? 0;
       const minOT = planner?.minOT?.[id] ?? 0;
       const main = Math.min(total, base);
       const ot = Math.max(0, total - base);
       const deficit = Math.max(0, minOT - ot);
-      rows.push({ id, name, role, base, minOT, total, main, ot, deficit });
+      rows.push({ id, name, role, color, base, minOT, total, main, ot, deficit });
     }
     rows.sort((a, b) => b.deficit - a.deficit || b.ot - a.ot || a.name.localeCompare(b.name, 'th'));
     return rows;
@@ -248,9 +260,9 @@ export default function CalendarMonth() {
   return (
     <div className='space-y-4'>
       {/* Toolbar */}
-      <div className='flex flex-col md:flex-row md:flex-wrap md:items-center gap-2'>
+      <div className='flex flex-col gap-2'>
         <h1 className='text-xl font-semibold'>ปฏิทินรายเดือน</h1>
-        <div className='flex flex-col sm:flex-row gap-2 sm:items-center sm:flex-wrap w-full md:w-auto'>
+        <div className='flex flex-col lg:flex-row gap-2 sm:items-center sm:flex-wrap w-full md:w-auto'>
           <select
             className='select w-full sm:w-64'
             value={wid}
@@ -272,35 +284,35 @@ export default function CalendarMonth() {
             value={ym}
             onChange={(e) => setYm(e.target.value)}
           />
-        </div>
 
-        {wid && (
-          <div className='flex flex-wrap items-center gap-2'>
-            <a
-              className='btn'
-              href={`/api/export/xlsx?wid=${wid}&ym=${ym}`}
-              target='_blank'
-            >
-              Export Excel
-            </a>
-            {isAdmin && (
-              <>
-                <button
-                  className='btn-primary w-full sm:w-auto'
-                  onClick={triggerAssignAll}
-                >
-                  Auto Assign
-                </button>
-                <button
-                  className='btn w-full sm:w-auto'
-                  onClick={clearAuto}
-                >
-                  ล้าง Auto Assign
-                </button>
-              </>
-            )}
-          </div>
-        )}
+          {wid && (
+            <div className='flex md:flex-row items-center gap-2 w-full '>
+              <a
+                className='btn w-full'
+                href={`/api/export/xlsx?wid=${wid}&ym=${ym}`}
+                target='_blank'
+              >
+                Export Excel
+              </a>
+              {isAdmin && (
+                <>
+                  <button
+                    className='btn-primary w-full'
+                    onClick={triggerAssignAll}
+                  >
+                    Auto Assign
+                  </button>
+                  <button
+                    className='btn w-full'
+                    onClick={clearAuto}
+                  >
+                    ล้าง Auto Assign
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* --------- สรุปยอดเดือนนี้ --------- */}
@@ -331,7 +343,7 @@ export default function CalendarMonth() {
                   <th>ขาด/เกิน OT ขั้นต่ำ</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className='relative'>
                 {summaryRows.map((r) => (
                   <tr key={r.id}>
                     <td className='whitespace-nowrap'>{r.name}</td>
@@ -370,10 +382,11 @@ export default function CalendarMonth() {
 
       {/* Calendar grid: 1/2/3/5/7 columns by breakpoint */}
       {!wid ? (
-        <div className='text-zinc-500'>กรุณาเลือกสถานที่เพื่อดูปฏิทิน</div>
+        <div className='text-zinc-500 text-center'>กรุณาเลือกสถานที่เพื่อดูปฏิทิน</div>
       ) : (
         <CalendarGrid
           daysInMonth={daysInMonth}
+          ym={ym}
           SHIFTS={SHIFTS}
           aIndex={aIndex}
           vIndex={vIndex}

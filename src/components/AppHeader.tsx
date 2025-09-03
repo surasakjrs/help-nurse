@@ -22,7 +22,9 @@ function NavItem({
     <Link
       href={disabled ? '#' : href}
       aria-disabled={disabled}
-      className={`btn ${active ? 'btn-active' : ''} ${disabled ? 'pointer-events-none opacity-60' : ''}`}
+      className={`shadow-sm w-full btn ${active ? 'btn-active' : ''} ${
+        disabled ? 'pointer-events-none opacity-60' : ''
+      }`}
     >
       {children}
     </Link>
@@ -45,7 +47,7 @@ export default function AppHeader() {
         Nurse Roster
       </Link>
 
-      <nav className='flex items-center gap-2'>
+      <nav className='flex flex-col items-center gap-2 w-full md:flex-row md:justify-end md:gap-4'>
         {/* ขวาสุด: สถานะผู้ใช้ */}
         {user ? (
           <>
@@ -106,7 +108,7 @@ export default function AppHeader() {
             )}
             <span className='text-sm text-zinc-600 hidden md:block'>{user.displayName || user.email}</span>
             <button
-              className='btn'
+              className='btn w-full'
               onClick={() => withLoading(() => signOut(), 'ออกจากระบบ')}
               title='Logout'
             >

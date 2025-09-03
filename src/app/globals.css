@@ -12,10 +12,7 @@ body,
 #__next {
   height: 100%;
 }
-body {
-  background: #f8fafc;
-  color: #0b0e12;
-}
+
 .container-max {
   max-width: 1200px;
   margin: 0 auto;
@@ -27,7 +24,7 @@ body {
   @apply inline-flex items-center justify-center rounded-2xl px-3 py-2 text-sm font-semibold bg-black text-white hover:bg-zinc-800;
 }
 .card {
-  @apply rounded-2xl border border-zinc-200 bg-white;
+  @apply rounded-2xl border border-zinc-200 bg-white shadow-2xl;
 }
 .input {
   @apply w-full rounded-xl border border-zinc-300 px-3 py-2;
@@ -50,7 +47,7 @@ body {
 
 /* Calendar styles */
 .cell {
-  @apply min-h-24 h-24 border border-zinc-200 relative p-1 bg-white;
+  @apply min-h-24 border border-zinc-200 relative bg-white rounded-2xl shadow-2xl;
 }
 .cell .date {
   @apply absolute top-1 right-2 text-xs text-zinc-500;
@@ -72,10 +69,10 @@ body {
   @apply text-xs underline text-zinc-600 hover:text-black;
 }
 
-.cell {
+/* .cell {
   @apply border border-zinc-200 relative p-2 bg-white rounded-xl;
-  min-height: 30rem; /* เดิม ~h-24 → ขยายเป็น ~h-40 */
-}
+  min-height: 30rem;
+} */
 .cell.big {
   min-height: 30rem;
 } /* h ~ 40 */

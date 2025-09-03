@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang='th'
       suppressHydrationWarning
     >
-      <body className='bg-zinc-50 text-zinc-900'>
+      <body className='bg-zinc-100 text-zinc-900'>
         {/* ให้ overlay ครอบทั้งแอป → วาง LoadingProvider ไว้ข้างนอก */}
         <LoadingProvider>
           <AuthProvider>
