@@ -1,7 +1,7 @@
 import { db } from '@/lib/firebaseClient';
 import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import type { Planner, ShiftType, Staff } from '@/types/schema';
-import { daysIn } from './util';
+import { daysIn } from '../src/lib/util';
 import { getPlanner } from '@/services/planner.service';
 import { listStaff } from '@/services/staff.service';
 import { getAssignmentsByMonth } from '@/services/assignment.service';

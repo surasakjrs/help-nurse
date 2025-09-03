@@ -1,7 +1,7 @@
 import { db } from '@/lib/firebaseClient';
 import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import type { Planner, ShiftType, Staff } from '@/types/schema';
-import { daysIn } from './util';
+import { daysIn } from '../src/lib/util';
 import { getPlanner } from '@/services/planner.service';
 import { listStaff } from '@/services/staff.service';
 import { getAssignmentsByMonth } from '@/services/assignment.service';
@@ -84,21 +84,27 @@ function softPenalty(sid: string, day: number, _shift: ShiftType, _planner: Plan
   return penalty;
 }
 
-// ★ ให้ความสำคัญกับ base ที่ยังไม่ครบ + OT ขั้นต่ำที่ยัง “ขาด”
+// ★ อัปเดต: ให้ความสำคัญกับ base ที่ยังไม่ครบ + OT ขั้นต่ำที่ยัง “ขาด”
 function scoreCandidate(sid: string, shift: ShiftType, planner: Planner, state: AssignState): number {
   const base = planner.baseShifts[sid] || 0;
   const already = state.countByStaff[sid] || 0;
 
-  const pref = planner.preferences[sid]?.[shift] ?? 0.5; // 0..1
+  // ความชอบเวร (0..1)
+  const pref = planner.preferences[sid]?.[shift] ?? 0.5;
 
+  // ส่วนของ “base ที่ยังไม่ครบ” → normalize เป็น 0..1
   const baseRemaining = Math.max(0, base - already);
   const baseNorm = base > 0 ? baseRemaining / base : 0;
 
+  // ส่วนของ “OT ขั้นต่ำที่ยังขาด”
   const currentOT = Math.max(0, already - base);
-  const minOT = planner.minOT[sid] || 0;
-  const otDeficit = Math.max(0, minOT - currentOT);
-  const otNorm = minOT > 0 ? otDeficit / minOT : 0;
+  const minOT = planner.minOT[sid] || 0; // ค่าเป้าหมาย OT ขั้นต่ำของคนนี้
+  const otDeficit = Math.max(0, minOT - currentOT); // ยังขาดอยู่เท่าไร
+  const otNorm = minOT > 0 ? otDeficit / minOT : 0; // 0..1
 
+  // รวมคะแนน (ถ่วงน้ำหนัก)
+  // - ให้ความสำคัญกับ “ยังไม่ครบ base” และ “ยังขาด OT ขั้นต่ำ” ใกล้เคียงกัน
+  // - คง factor ความชอบเวรไว้ เพื่อกระจายตาม preference
   return pref * 0.3 + baseNorm * 0.35 + otNorm * 0.35;
 }
 
@@ -167,7 +173,7 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
         const chosen: string[] = [];
         const violations: SlotViolation[] = [];
 
-        // 1) เลือก INCHARGE ก่อน
+        // 1) เลือก INCHARGE (strict → soft) เพื่อให้ถึง inMin (แต่ไม่เกิน inMax)
         const icStrict = incharges
           .filter((sid) => isHardBlocked(sid, day, shift, planner, state).length === 0)
           .sort(
@@ -192,7 +198,7 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           }
         }
 
-        // 2) เติมที่เหลือ
+        // 2) เติมคนที่เหลือ โดยให้ priority กับ base/OT ขั้นต่ำที่ยังขาด
         const pool = [...incharges, ...meds]
           .filter((sid) => !chosen.includes(sid) && isHardBlocked(sid, day, shift, planner, state).length === 0)
           .sort((a, b) => {
@@ -213,12 +219,12 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           chosen.push(sid);
         }
 
-        // 3) violations
+        // 3) ตรวจ violations
         const icFinal = chosen.filter((id) => staffMap[id].role === 'INCHARGE').length;
         if (icFinal < inMin) violations.push('NO_INCHARGE');
         if (chosen.length < need) violations.push('UNDER_STAFFED');
 
-        // 4) persist + state
+        // 4) persist + อัปเดต state
         const id = `${wid}-${ym}-${day}-${shift}`;
         await setDoc(doc(db, 'assignments', id), {
           wid,
@@ -227,7 +233,6 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           shift,
           staffIds: chosen,
           violations,
-          source: 'AUTO',
           createdAt: serverTimestamp(),
         });
 
@@ -307,7 +312,6 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
         shift,
         staffIds: chosen,
         violations: vios,
-        source: 'AUTO',
         updatedAt: serverTimestamp(),
       });
 

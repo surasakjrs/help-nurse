@@ -1,7 +1,7 @@
 import { db } from '@/lib/firebaseClient';
 import { collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import type { Planner, ShiftType, Staff } from '@/types/schema';
-import { daysIn } from './util';
+import { daysIn } from '../src/lib/util';
 import { getPlanner } from '@/services/planner.service';
 import { listStaff } from '@/services/staff.service';
 import { getAssignmentsByMonth } from '@/services/assignment.service';
@@ -41,20 +41,17 @@ function dayPairKey(state: AssignState, sid: string, day: number): string | null
 
 function wouldCreatePairViolation(state: AssignState, sid: string, day: number, proposed: ShiftType): boolean {
   const today = shiftsOnDay(state, sid, day);
-  // เช็คกติกาเฉพาะตอนที่จะกลายเป็น "2 เวร/วัน"
-  if (today.length !== 1) return false;
+  if (today.length !== 1) return false; // ตรวจเฉพาะจังหวะที่จะกลายเป็น 2 เวร/วัน
   const pairNow = [today[0], proposed].sort(sortShift) as [ShiftType, ShiftType];
   const pairKey = `${pairNow[0]}+${pairNow[1]}`;
-
-  // นับย้อนหลังว่า "คู่เดิม" ซ้ำมากี่วันแล้ว (เฉพาะวันที่มี 2 เวร)
+  // นับย้อนหลังว่าคู่เดิมซ้ำมากี่วันแล้ว
   let run = 0;
   for (let d = day - 1; d >= 1; d--) {
     const k = dayPairKey(state, sid, d);
     if (k === pairKey) run += 1;
     else break;
   }
-  // ถ้า 3 วันติดอยู่แล้ว การทำซ้ำในวันนี้จะเป็น "เกิน 3 วัน" → ห้าม
-  return run >= 3;
+  return run >= 2; // ถ้า 2 วันติดอยู่แล้ว วันนี้จะเป็นวันที่ 4 → ห้าม
 }
 
 function isHardBlocked(sid: string, day: number, shift: ShiftType, planner: Planner, state: AssignState): string[] {
@@ -62,17 +59,17 @@ function isHardBlocked(sid: string, day: number, shift: ShiftType, planner: Plan
   const dOff = new Set(planner.dayOff[sid] || []);
   if (dOff.has(day)) reasons.push('dayOff');
 
-  // Max 2 shifts/day (hard)
+  // Max 2 เวร/วัน
   const dKey = `${day}-${sid}`;
   if ((state.perDay[dKey] ?? 0) >= 2) reasons.push('เกิน 2 เวร/วัน');
 
-  // NIGHT -> MORNING next day (hard)
+  // ห้าม NIGHT→MORNING
   const last = state.lastShift[sid];
   if (last && last.day === day - 1 && last.shift === 'NIGHT' && shift === 'MORNING') {
     reasons.push('ห้าม NIGHT→MORNING วันถัดไป');
   }
 
-  // NEW hard rule: ห้าม 2 เวร/วันคู่เดิม ซ้ำติดกันเกิน 3 วัน
+  // NEW hard: ห้าม 2 เวร/วัน “คู่เดิม” ซ้ำเกิน 3 วันติด
   if (wouldCreatePairViolation(state, sid, day, shift)) {
     reasons.push('ห้าม 2 เวรคู่เดิมซ้ำเกิน 3 วันติด');
   }
@@ -80,19 +77,29 @@ function isHardBlocked(sid: string, day: number, shift: ShiftType, planner: Plan
   return reasons;
 }
 
-// เงื่อนไขอ่อน (soft) เหลือเฉพาะ "ทำงานติดกันเกิน 5 วัน" เท่านั้น
+// soft: เหลือเฉพาะ “ทำงานติดกัน >=5 วัน” → ลดคะแนน
 function softPenalty(sid: string, day: number, _shift: ShiftType, _planner: Planner, state: AssignState): number {
   let penalty = 0;
   if ((state.consecDays[sid] ?? 0) >= 5) penalty += 1.0;
   return penalty;
 }
 
+// ★ ให้ความสำคัญกับ base ที่ยังไม่ครบ + OT ขั้นต่ำที่ยัง “ขาด”
 function scoreCandidate(sid: string, shift: ShiftType, planner: Planner, state: AssignState): number {
   const base = planner.baseShifts[sid] || 0;
   const already = state.countByStaff[sid] || 0;
-  const remainingNeed = Math.max(0, base - already);
-  const pref = planner.preferences[sid]?.[shift] ?? 0.5;
-  return pref * 0.5 + remainingNeed * 0.5;
+
+  const pref = planner.preferences[sid]?.[shift] ?? 0.5; // 0..1
+
+  const baseRemaining = Math.max(0, base - already);
+  const baseNorm = base > 0 ? baseRemaining / base : 0;
+
+  const currentOT = Math.max(0, already - base);
+  const minOT = planner.minOT?.[sid] || 0;
+  const otDeficit = Math.max(0, minOT - currentOT);
+  const otNorm = minOT > 0 ? otDeficit / minOT : 0;
+
+  return pref * 0.3 + baseNorm * 0.35 + otNorm * 0.35;
 }
 
 async function loadStateFromExisting(
@@ -153,21 +160,25 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
     for (const s of snaps.docs) await deleteDoc(s.ref);
 
     const state: AssignState = { assigned: {}, perDay: {}, consecDays: {}, lastShift: {}, countByStaff: {} };
+    // เก็บสภาพในหน่วยความจำ เพื่อทำ "quota fill pass"
+    const slotStaff: Record<string, string[]> = {};
 
+    // -------- รอบที่ 1: จัดตามกติกาพื้นฐาน + คะแนน ----------
     for (let day = 1; day <= days; day++) {
       for (const shift of ORDER) {
         const need = demand[shift];
         const chosen: string[] = [];
         const violations: SlotViolation[] = [];
 
-        // 1) เลือก INCHARGE ก่อน (strict → soft)
+        // 1) เลือก INCHARGE ให้ถึง inMin (ไม่เกิน inMax)
         const icStrict = incharges
           .filter((sid) => isHardBlocked(sid, day, shift, planner, state).length === 0)
-          .sort((a, b) => {
-            const sb = scoreCandidate(b, shift, planner, state) - softPenalty(b, day, shift, planner, state);
-            const sa = scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state);
-            return sb - sa;
-          });
+          .sort(
+            (a, b) =>
+              scoreCandidate(b, shift, planner, state) -
+              softPenalty(b, day, shift, planner, state) -
+              (scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state))
+          );
         while (
           chosen.filter((id) => staffMap[id].role === 'INCHARGE').length < Math.min(inMax, inMin) &&
           icStrict.length
@@ -184,19 +195,20 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           }
         }
 
-        // 2) เติมคนที่เหลือ (จำกัด INCHARGE ไม่เกิน inMax)
-        const pool = [...incharges, ...meds].filter(
-          (sid) => !chosen.includes(sid) && isHardBlocked(sid, day, shift, planner, state).length === 0
-        );
-        pool.sort((a, b) => {
-          const icCount = chosen.filter((id) => staffMap[id].role === 'INCHARGE').length;
-          const aIC = staffMap[a].role === 'INCHARGE' && icCount >= inMax;
-          const bIC = staffMap[b].role === 'INCHARGE' && icCount >= inMax;
-          if (aIC !== bIC) return aIC ? 1 : -1;
-          const sb = scoreCandidate(b, shift, planner, state) - softPenalty(b, day, shift, planner, state);
-          const sa = scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state);
-          return sb - sa;
-        });
+        // 2) เติมคนจนถึง need (จำกัด INCHARGE ไม่เกิน inMax)
+        const pool = [...incharges, ...meds]
+          .filter((sid) => !chosen.includes(sid) && isHardBlocked(sid, day, shift, planner, state).length === 0)
+          .sort((a, b) => {
+            const icCount = chosen.filter((id) => staffMap[id].role === 'INCHARGE').length;
+            const aICFull = staffMap[a].role === 'INCHARGE' && icCount >= inMax;
+            const bICFull = staffMap[b].role === 'INCHARGE' && icCount >= inMax;
+            if (aICFull !== bICFull) return aICFull ? 1 : -1;
+            return (
+              scoreCandidate(b, shift, planner, state) -
+              softPenalty(b, day, shift, planner, state) -
+              (scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state))
+            );
+          });
         for (const sid of pool) {
           if (chosen.length >= need) break;
           const icCount = chosen.filter((id) => staffMap[id].role === 'INCHARGE').length;
@@ -204,13 +216,14 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           chosen.push(sid);
         }
 
-        // 3) ตรวจ violations
+        // 3) violations
         const icFinal = chosen.filter((id) => staffMap[id].role === 'INCHARGE').length;
         if (icFinal < inMin) violations.push('NO_INCHARGE');
         if (chosen.length < need) violations.push('UNDER_STAFFED');
 
-        // 4) persist + อัปเดต state
+        // 4) persist รอบแรก + อัปเดต state
         const id = `${wid}-${ym}-${day}-${shift}`;
+        slotStaff[key(day, shift)] = [...chosen];
         await setDoc(doc(db, 'assignments', id), {
           wid,
           ym,
@@ -218,12 +231,13 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           shift,
           staffIds: chosen,
           violations,
+          source: 'AUTO',
           createdAt: serverTimestamp(),
         });
 
         for (const sid of chosen) {
           const dk = `${day}-${sid}`;
-          state.assigned[key(day, shift)] = chosen;
+          state.assigned[key(day, shift)] = slotStaff[key(day, shift)];
           state.perDay[dk] = (state.perDay[dk] ?? 0) + 1;
           state.countByStaff[sid] = (state.countByStaff[sid] ?? 0) + 1;
           state.consecDays[sid] = (state.consecDays[sid] ?? 0) + 1;
@@ -231,10 +245,112 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
         }
       }
     }
+
+    // -------- รอบที่ 2: บังคับเติมให้ครบตาม Base + MinOT (ถ้ายังมีช่องว่าง) ----------
+    const targetByStaff: Record<string, number> = {};
+    for (const s of staff) {
+      if (!s.active) continue;
+      const base = planner.baseShifts?.[s.id] || 0;
+      const minOT = planner.minOT?.[s.id] || 0;
+      targetByStaff[s.id] = base + minOT;
+    }
+
+    // พยายามเติมลงช่องว่างที่ยังไม่ครบ need โดยจัดให้คนที่ "ขาดจาก target" ก่อน
+    let changed = true;
+    let safety = 5; // ป้องกันลูปยาวเกินไป
+    while (changed && safety-- > 0) {
+      changed = false;
+
+      // คำนวณ deficit ปัจจุบัน
+      const deficitOrder = Object.keys(targetByStaff)
+        .map((sid) => ({
+          sid,
+          deficit: Math.max(0, (targetByStaff[sid] ?? 0) - (state.countByStaff[sid] ?? 0)),
+        }))
+        .filter((x) => x.deficit > 0)
+        .sort((a, b) => b.deficit - a.deficit); // คนที่ขาดเยอะสุดก่อน
+
+      if (!deficitOrder.length) break;
+
+      for (let day = 1; day <= days; day++) {
+        for (const shift of ORDER) {
+          const k = key(day, shift);
+          const need = demand[shift];
+          const chosen = slotStaff[k] || [];
+          if (chosen.length >= need) continue; // ช่องนี้เต็มแล้ว
+
+          // จำนวน INCHARGE ปัจจุบันในช่องนี้
+          const icCount = chosen.filter((id) => staffMap[id]?.role === 'INCHARGE').length;
+
+          // หา candidate จากคนที่ยังขาด target
+          const pool = deficitOrder
+            .map((x) => x.sid)
+            .filter((sid) => !chosen.includes(sid))
+            .filter((sid) => isHardBlocked(sid, day, shift, planner, state).length === 0)
+            .filter((sid) => {
+              // จำกัดเพดาน INCHARGE ต่อเวร
+              if (staffMap[sid]?.role === 'INCHARGE' && icCount >= inMax) return false;
+              return true;
+            })
+            .sort((a, b) => {
+              // เรียงตาม deficit ก่อน แล้วตาม score (base+minOT+pref) และ softPenalty
+              const defA = Math.max(0, (targetByStaff[a] ?? 0) - (state.countByStaff[a] ?? 0));
+              const defB = Math.max(0, (targetByStaff[b] ?? 0) - (state.countByStaff[b] ?? 0));
+              if (defB !== defA) return defB - defA;
+              return (
+                scoreCandidate(b, shift, planner, state) -
+                softPenalty(b, day, shift, planner, state) -
+                (scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state))
+              );
+            });
+
+          if (pool.length) {
+            const sid = pool[0];
+            chosen.push(sid);
+            slotStaff[k] = chosen;
+            // อัปเดต state เมื่อเติมสำเร็จ
+            const dk = `${day}-${sid}`;
+            state.assigned[k] = chosen;
+            state.perDay[dk] = (state.perDay[dk] ?? 0) + 1;
+            state.countByStaff[sid] = (state.countByStaff[sid] ?? 0) + 1;
+            state.consecDays[sid] = (state.consecDays[sid] ?? 0) + 1;
+            state.lastShift[sid] = { day, shift };
+            changed = true;
+          }
+        }
+      }
+    }
+
+    // สรุป violations ใหม่ แล้วเขียนทับทุกช่อง (updatedAt)
+    for (let day = 1; day <= days; day++) {
+      for (const shift of ORDER) {
+        const k = key(day, shift);
+        const chosen = slotStaff[k] || [];
+        const need = demand[shift];
+        const icFinal = chosen.filter((id) => staffMap[id]?.role === 'INCHARGE').length;
+
+        const vios: SlotViolation[] = [];
+        if (icFinal < inMin) vios.push('NO_INCHARGE');
+        if (chosen.length < need) vios.push('UNDER_STAFFED');
+
+        const id = `${wid}-${ym}-${day}-${shift}`;
+        await setDoc(doc(db, 'assignments', id), {
+          wid,
+          ym,
+          day,
+          shift,
+          staffIds: chosen,
+          violations: vios,
+          source: 'AUTO',
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
+
     return { ok: true, mode };
   }
 
-  // ------- โหมดเติม (incremental) -------
+  // ------- โหมดเติมเฉพาะบทบาท (INCHARGE / MED) -------
   const { state, existingMap } = await loadStateFromExisting(wid, ym);
 
   for (let day = 1; day <= days; day++) {
@@ -251,11 +367,12 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           const pool = incharges
             .filter((sid) => !chosen.includes(sid))
             .filter((sid) => isHardBlocked(sid, day, shift, planner, state).length === 0)
-            .sort((a, b) => {
-              const sb = scoreCandidate(b, shift, planner, state) - softPenalty(b, day, shift, planner, state);
-              const sa = scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state);
-              return sb - sa;
-            });
+            .sort(
+              (a, b) =>
+                scoreCandidate(b, shift, planner, state) -
+                softPenalty(b, day, shift, planner, state) -
+                (scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state))
+            );
           while (
             chosen.filter((id) => staffMap[id].role === 'INCHARGE').length < Math.min(inMax, inMin) &&
             chosen.length < need &&
@@ -271,11 +388,12 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
           const pool = meds
             .filter((sid) => !chosen.includes(sid))
             .filter((sid) => isHardBlocked(sid, day, shift, planner, state).length === 0)
-            .sort((a, b) => {
-              const sb = scoreCandidate(b, shift, planner, state) - softPenalty(b, day, shift, planner, state);
-              const sa = scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state);
-              return sb - sa;
-            });
+            .sort(
+              (a, b) =>
+                scoreCandidate(b, shift, planner, state) -
+                softPenalty(b, day, shift, planner, state) -
+                (scoreCandidate(a, shift, planner, state) - softPenalty(a, day, shift, planner, state))
+            );
           while (chosen.length < need && pool.length) {
             chosen.push(pool.shift()!);
           }
@@ -295,6 +413,7 @@ export async function runAutoAssign(wid: string, ym: string, mode: Mode = 'ALL')
         shift,
         staffIds: chosen,
         violations: vios,
+        source: 'AUTO',
         updatedAt: serverTimestamp(),
       });
 
