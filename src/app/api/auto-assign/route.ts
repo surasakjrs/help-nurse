@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runAutoAssign } from '@/lib/autoAssign';
+// import { runAutoAssign } from '@/lib/autoAssign';
+import { runAutoAssign } from '@/lib/autoAssign.nmfix';
 
 export const runtime = 'nodejs'; // ใช้ Node runtime สำหรับงานหนัก
 export const dynamic = 'force-dynamic'; // ไม่ cache

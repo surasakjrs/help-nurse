@@ -1,19 +1,24 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { addStaff, listStaff, removeStaff, updateStaff } from '@/services/staff.service';
-import type { StaffRole } from '@/types/schema';
+import type { PersonColorKey, StaffRole } from '@/types/schema';
+import { PERSON_COLORS } from '@/utils/personColor';
+import ColorDropdown from './ColorDropdown';
 
 export default function StaffManager({ wid }: { wid: string }) {
   const [items, setItems] = useState<any[]>([]);
   const [name, setName] = useState('');
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState('พยาบาล');
   const [role, setRole] = useState<StaffRole>('INCHARGE');
+  const [color, setColor] = useState<PersonColorKey>('red');
   const [loading, setLoading] = useState(false);
 
   // inline edit states
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editTitle, setEditTitle] = useState('');
+  const [editRole, setEditRole] = useState<StaffRole>('INCHARGE');
+  const [editColor, setEditColor] = useState<PersonColorKey>('red');
   const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
@@ -37,7 +42,7 @@ export default function StaffManager({ wid }: { wid: string }) {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await addStaff({ wid, name: name.trim(), title: title.trim() || undefined, role, active: true });
+      await addStaff({ wid, name: name.trim(), title: title.trim() || undefined, role, active: true, color: color });
       // setName(''); setTitle(''); setRole('INCHARGE'); // ถ้าต้องการเคลียร์ฟอร์ม
       await refresh();
     } finally {
@@ -49,6 +54,8 @@ export default function StaffManager({ wid }: { wid: string }) {
     setEditId(it.id);
     setEditName(it.name ?? '');
     setEditTitle(it.title ?? '');
+    setEditRole(it.role as StaffRole);
+    setEditColor(it.color as PersonColorKey);
   };
 
   const cancelEdit = () => {
@@ -66,6 +73,8 @@ export default function StaffManager({ wid }: { wid: string }) {
       await updateStaff(editId, {
         name: editName.trim(),
         title: editTitle.trim() || undefined,
+        role: editRole,
+        color: editColor,
       });
       await refresh();
       cancelEdit();
@@ -87,6 +96,8 @@ export default function StaffManager({ wid }: { wid: string }) {
             className='input'
             placeholder='ชื่อ'
             value={name}
+            name='name'
+            autoComplete='on'
             onChange={(e) => setName(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
           />
@@ -94,17 +105,43 @@ export default function StaffManager({ wid }: { wid: string }) {
             className='input'
             placeholder='ตำแหน่ง'
             value={title}
+            name='title'
             onChange={(e) => setTitle(e.target.value)}
             onFocus={(e) => e.currentTarget.select()}
           />
           <select
             className='select'
             value={role}
+            name='role'
             onChange={(e) => setRole(e.target.value as StaffRole)}
           >
             <option value='INCHARGE'>INCHARGE</option>
             <option value='MED'>MED</option>
           </select>
+
+          <ColorDropdown
+            value={color}
+            onChange={setColor}
+          />
+          {/* <select
+            className='select'
+            value={color}
+            onChange={(e) => setColor(e.target.value as PersonColorKey | '')}
+          >
+            <option value=''>— สีประจำตัว —</option>
+            {(Object.keys(PERSON_COLORS) as PersonColorKey[]).map((k) => (
+              <option
+                key={k}
+                value={k}
+              >
+                <span
+                  className='w-4 h-4 inline-block mr-2 align-middle rounded-sm'
+                  style={{ backgroundColor: PERSON_COLORS[k].cls.split(' ')[0].replace('bg-', '').replace('-100', '') }}
+                />
+                {PERSON_COLORS[k].label}
+              </option>
+            ))}
+          </select> */}
           <button
             className='btn-primary'
             onClick={onAdd}
@@ -121,66 +158,79 @@ export default function StaffManager({ wid }: { wid: string }) {
           return (
             <div
               key={it.id}
-              className='card p-4'
+              className={`card p-4 flex flex-row`}
             >
-              {/* Header: ชื่อ/ตำแหน่ง + badges */}
-              <div className='flex items-start justify-between gap-3'>
-                <div className='min-w-0'>
-                  {/* ชื่อ */}
+              <div className='flex items-center justify-between gap-3 grow flex-wrap'>
+                {isEditing ? (
+                  <input
+                    className='input w-full'
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={onEditKeyDown}
+                    autoFocus
+                    onFocus={(e) => e.currentTarget.select()}
+                    placeholder='กรอกชื่อ'
+                  />
+                ) : (
+                  <div
+                    className='font-medium break-words w-full lg:w-auto'
+                    onDoubleClick={() => startEdit(it)}
+                  >
+                    {it.name}
+                  </div>
+                )}
+
+                <div className='mt-1'>
                   {isEditing ? (
                     <input
                       className='input w-full'
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
                       onKeyDown={onEditKeyDown}
-                      autoFocus
                       onFocus={(e) => e.currentTarget.select()}
-                      placeholder='กรอกชื่อ'
+                      placeholder='ตำแหน่ง'
                     />
                   ) : (
-                    <div
-                      className='font-medium break-words'
+                    <span
+                      className='text-sm text-zinc-500 break-words'
                       onDoubleClick={() => startEdit(it)}
                     >
-                      {it.name}
-                    </div>
+                      {it.title || '-'}
+                    </span>
                   )}
+                </div>
 
-                  {/* ตำแหน่ง */}
-                  <div className='mt-1'>
-                    {isEditing ? (
-                      <input
-                        className='input w-full'
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        onKeyDown={onEditKeyDown}
-                        onFocus={(e) => e.currentTarget.select()}
-                        placeholder='ตำแหน่ง'
-                      />
-                    ) : (
-                      <span
-                        className='text-sm text-zinc-500 break-words'
-                        onDoubleClick={() => startEdit(it)}
-                      >
-                        {it.title || '-'}
-                      </span>
-                    )}
+                {isEditing ? (
+                  <div className='flex items-center gap-2'>
+                    <ColorDropdown
+                      value={editColor}
+                      onChange={setEditColor}
+                    />
+                    <span className={`badge ${PERSON_COLORS[editColor]?.cls}`}>{PERSON_COLORS[editColor]?.label}</span>
                   </div>
-                </div>
-
-                {/* บทบาท + สถานะ */}
-                <div className='flex flex-col items-end gap-2 shrink-0'>
-                  <span className='badge'>{it.role}</span>
-                  <span
-                    className={'badge ' + (it.active ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-600')}
-                  >
-                    {it.active ? 'Active' : 'Inactive'}
+                ) : (
+                  <span className={`badge w-20 text-center ${PERSON_COLORS[it.color]?.cls}`}>
+                    {PERSON_COLORS[it.color]?.label || 'No Color'}
                   </span>
-                </div>
-              </div>
+                )}
 
-              {/* Actions */}
-              <div className='mt-3 flex flex-wrap gap-2 justify-end'>
+                {/* Role */}
+                {isEditing ? (
+                  <select
+                    className='select'
+                    value={editRole}
+                    onChange={(e) => setEditRole(e.target.value as StaffRole)}
+                  >
+                    <option value='INCHARGE'>INCHARGE</option>
+                    <option value='MED'>MED</option>
+                  </select>
+                ) : (
+                  <span className='badge'>{it.role}</span>
+                )}
+                {/* <span className={'badge ' + (it.active ? 'bg-green-100 text-green-700' : 'bg-zinc-100 text-zinc-600')}>
+                  {it.active ? 'Active' : 'Inactive'}
+                </span> */}
+
                 {isEditing ? (
                   <>
                     <button
@@ -201,19 +251,19 @@ export default function StaffManager({ wid }: { wid: string }) {
                 ) : (
                   <>
                     <button
-                      className='btn'
+                      className='btn shadow-sm'
                       onClick={() => startEdit(it)}
                     >
                       แก้ไข
                     </button>
-                    <button
+                    {/* <button
                       className='btn'
                       onClick={() => updateStaff(it.id, { active: !it.active }).then(refresh)}
                     >
                       {it.active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
-                    </button>
+                    </button> */}
                     <button
-                      className='btn'
+                      className='btn shadow-sm'
                       onClick={() => removeStaff(it.id).then(refresh)}
                     >
                       ลบ

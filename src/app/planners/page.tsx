@@ -19,7 +19,7 @@ export default function PlannersIndex() {
         <div className='flex flex-col gap-2'>
           {items.map((w) => (
             <Link
-              className='border border-black rounded-3xl p-4 cursor-pointer w-full block hover:bg-gray-100'
+              className='border border-gray-400 shadow-md rounded-3xl p-4 cursor-pointer w-full block hover:bg-gray-100'
               key={w.id}
               href={`/planners/${w.id}`}
             >

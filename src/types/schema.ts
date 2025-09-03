@@ -5,6 +5,28 @@ export type ShiftType = 'MORNING' | 'AFTERNOON' | 'NIGHT';
 export type Violation = 'NO_INCHARGE' | 'UNDER_STAFFED';
 export type AssignmentSource = 'AUTO' | 'MANUAL';
 
+export type PersonColorKey =
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'yellow'
+  | 'lime'
+  | 'green'
+  | 'emerald'
+  | 'teal'
+  | 'cyan'
+  | 'sky'
+  | 'blue'
+  | 'indigo'
+  | 'violet'
+  | 'purple'
+  | 'fuchsia'
+  | 'pink'
+  | 'rose'
+  | 'slate'
+  | 'stone'
+  | 'zinc';
+
 export interface Workplace {
   id: string;
   ownerId: string;
@@ -23,6 +45,7 @@ export interface Staff {
   title?: string;
   role: StaffRole;
   active: boolean;
+  color?: PersonColorKey; // <— ใส่สีประจำตัวที่นี่
   createdAt?: any;
   updatedAt?: any;
 }

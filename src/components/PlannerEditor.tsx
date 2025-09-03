@@ -8,7 +8,7 @@ import { useLoading } from '@/context/LoadingContext';
 
 const SHIFTS: ShiftType[] = ['MORNING', 'AFTERNOON', 'NIGHT'];
 const DEFAULT_BASE = 22; // เวรหลักต่อเดือนเริ่มต้น
-const DEFAULT_MIN_OT = 0; // OT ขั้นต่ำเริ่มต้น
+const DEFAULT_MIN_OT = 10; // OT ขั้นต่ำเริ่มต้น
 
 function ymNow() {
   const d = new Date();
