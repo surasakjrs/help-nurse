@@ -24,5 +24,9 @@ export const PERSON_COLORS: Record<PersonColorKey, { label: string; cls: string 
 };
 
 export function personPillClass(color?: PersonColorKey | null) {
-  return color ? `badge border ${PERSON_COLORS[color].cls}` : 'badge';
+  return color ? `${PERSON_COLORS[color].cls}` : '';
+}
+
+export function personPillLabel(label?: PersonColorKey | null) {
+  return label ? `${PERSON_COLORS[label].label}` : 'No Color';
 }

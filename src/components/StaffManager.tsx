@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { addStaff, listStaff, removeStaff, updateStaff } from '@/services/staff.service';
 import type { PersonColorKey, StaffRole } from '@/types/schema';
-import { PERSON_COLORS } from '@/utils/personColor';
+import { PERSON_COLORS, personPillClass, personPillLabel } from '@/utils/personColor';
 import ColorDropdown from './ColorDropdown';
 
 export default function StaffManager({ wid }: { wid: string }) {
@@ -209,8 +209,8 @@ export default function StaffManager({ wid }: { wid: string }) {
                     <span className={`badge ${PERSON_COLORS[editColor]?.cls}`}>{PERSON_COLORS[editColor]?.label}</span>
                   </div>
                 ) : (
-                  <span className={`badge w-20 text-center ${PERSON_COLORS[it.color]?.cls}`}>
-                    {PERSON_COLORS[it.color]?.label || 'No Color'}
+                  <span className={`badge w-20 text-center ${personPillClass(it.color)}`}>
+                    {personPillLabel(it.color)}
                   </span>
                 )}
 
