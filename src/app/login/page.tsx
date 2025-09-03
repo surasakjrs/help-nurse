@@ -2,7 +2,7 @@
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
-  const { user, signIn, signOut } = useAuth();
+  const { user, signIn } = useAuth();
   return (
     <div className='max-w-md mx-auto space-y-4 flex flex-col items-center'>
       <h1 className='text-2xl font-semibold'>เข้าสู่ระบบ</h1>

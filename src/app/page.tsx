@@ -1,6 +1,5 @@
 import AuthGate from '@/components/AuthGate';
 import HelpPage from '@/components/Help';
-import { useAuth } from '@/context/AuthContext';
 
 export default function Home() {
   return (

@@ -1,7 +1,7 @@
 'use client';
 import AuthGate from '@/components/AuthGate';
 import WorkplaceForm from '@/components/WorkplaceForm';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { createWorkplace, deleteWorkplace, listWorkplacesByOwner } from '@/services/workplaces.service';
 import Link from 'next/link';
@@ -20,13 +20,23 @@ function Content() {
   const { user } = useAuth();
   const [items, setItems] = useState<W[]>([]);
 
-  const refresh = () => {
+  // const refresh = () => {
+  //   if (!user) return;
+  //   listWorkplacesByOwner(user.uid).then(setItems as any);
+  // };
+
+  const refresh = useCallback(() => {
     if (!user) return;
     listWorkplacesByOwner(user.uid).then(setItems as any);
-  };
+  }, [user]);
+
   useEffect(() => {
     refresh();
-  }, [user]);
+  }, [refresh]);
+
+  // useEffect(() => {
+  //   refresh();
+  // }, [user]);
 
   return (
     <div className='space-y-6'>

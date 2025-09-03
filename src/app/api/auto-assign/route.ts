@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const ym = String(body?.ym ?? '').trim();
     const rawMode = String(body?.mode ?? '').toUpperCase() as Mode;
 
-    let mode: Mode = ['ALL', 'INCHARGE', 'MED'].includes(rawMode) ? rawMode : 'ALL';
+    const mode: Mode = ['ALL', 'INCHARGE', 'MED'].includes(rawMode) ? rawMode : 'ALL';
 
     if (!wid) {
       return NextResponse.json({ error: 'wid is required' }, { status: 400 });
